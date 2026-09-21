@@ -885,7 +885,7 @@ return (
 
     {gameFinished && (
       <div className="result">
-        <h2>結果発表！</h2>
+        <h2>結果発表！！！</h2>
 
 <p>
   {gameAlbumCount}枚すべてのアルバムを配置しました！
