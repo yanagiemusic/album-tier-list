@@ -2,6 +2,7 @@ import './App.css'
 import { getSheetCsv, parseSheetCsv } from './sheets'
 import { useEffect, useState } from 'react'
 import { getAlbumCoverByName } from './musicbrainz'
+import { supabase } from './supabase'
 
 function App() {
 const [albums, setAlbums] = useState([])
@@ -101,6 +102,7 @@ const handleStartGame = () => {
 
   console.log('ゲーム開始:', selectedAlbums)
 }
+
 useEffect(() => {
   const sheetNames = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G',
@@ -122,19 +124,62 @@ Promise.all(
       })
   )
 )
-    .then((csvList) => {
+    .then(async (csvList) => {
+      const { data: imageFiles, error: imageError } =
+  await supabase.storage
+    .from('album-covers')
+    .list()
+
+    const imageUrls = {}
+
+imageFiles.forEach((file) => {
+  const { data: urlData } =
+    supabase.storage
+      .from('album-covers')
+      .getPublicUrl(file.name)
+
+  imageUrls[file.name] = urlData.publicUrl
+})
+
+console.log('Supabase画像URL一覧:', imageUrls)
+
+if (imageError) {
+  console.error(
+    'Supabase画像一覧の取得エラー:',
+    imageError
+  )
+  return
+}
       const allData = csvList.flatMap((csv) =>
         parseSheetCsv(csv)
       )
 
       console.log('全データ:', allData)
 
-      const newAlbums = allData.map((album, index) => ({
-        id: index + 1,
-        title: album.title,
-        artist: album.artist,
-        tier: null,
-      }))
+      const savedImages = localStorage.getItem(
+  'album-tier-list-images'
+)
+
+const images = savedImages
+  ? JSON.parse(savedImages)
+  : {}
+
+const newAlbums = allData.map((album, index) => {
+  const imageKey =
+    `${album.artist}::${album.title}`
+
+  return {
+    id: index + 1,
+    title: album.title,
+    artist: album.artist,
+    tier: null,
+    image:
+  Object.entries(imageUrls).find(
+    ([fileName]) =>
+      fileName.startsWith(imageKey + '.')
+  )?.[1] || images[imageKey] || null,
+  }
+})
 
       setAllAlbums(newAlbums)
       setAlbums(newAlbums)
@@ -274,41 +319,61 @@ const shuffledAlbums = [...resetAlbums]
     setGameFinished(false)
   }
 
-const handleImageChange = (event, albumId) => {
+const handleImageChange = async (event, albumId) => {
   const file = event.target.files[0]
 
   if (!file) return
 
-  const reader = new FileReader()
+  const album = allAlbums.find(
+    (album) => album.id === albumId
+  )
 
-  reader.onload = () => {
-    const imageUrl = reader.result
+  if (!album) return
 
-    setAlbums((currentAlbums) =>
-      currentAlbums.map((album) =>
-        album.id === albumId
-          ? { ...album, image: imageUrl }
-          : album
-      )
+  const fileExtension =
+    file.name.split('.').pop()
+
+  const filePath =
+    `${album.artist}::${album.title}.${fileExtension}`
+
+  const { error: uploadError } =
+    await supabase.storage
+      .from('album-covers')
+      .upload(filePath, file, {
+        upsert: true,
+      })
+
+  if (uploadError) {
+    console.error(
+      '画像アップロードエラー:',
+      uploadError
     )
-
-    const savedImages = localStorage.getItem(
-      'album-tier-list-images'
-    )
-
-    const images = savedImages
-      ? JSON.parse(savedImages)
-      : {}
-
-    images[albumId] = imageUrl
-
-    localStorage.setItem(
-      'album-tier-list-images',
-      JSON.stringify(images)
-    )
+    alert('画像のアップロードに失敗しました')
+    return
   }
 
-  reader.readAsDataURL(file)
+  const { data } =
+    supabase.storage
+      .from('album-covers')
+      .getPublicUrl(filePath)
+
+  const imageUrl = data.publicUrl
+
+  setAlbums((currentAlbums) =>
+    currentAlbums.map((album) =>
+      album.id === albumId
+        ? { ...album, image: imageUrl }
+        : album
+    )
+  )
+
+  setAllAlbums((currentAlbums) =>
+    currentAlbums.map((album) =>
+      album.id === albumId
+        ? { ...album, image: imageUrl }
+        : album
+    )
+  )
 }
 const handleShareResult = () => {
   const resultText = ['S', 'A', 'B', 'C']

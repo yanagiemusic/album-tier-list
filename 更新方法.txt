@@ -1,0 +1,7 @@
+データを更新
+→アドレスバーからPowershellを開く
+→git add .　を入力
+→git commit -m "Update result screen" を入力
+→git push　を入力
+
+確認しておしまい！！！
