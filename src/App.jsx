@@ -334,8 +334,8 @@ const handleImageChange = async (event, albumId) => {
     file.name.split('.').pop()
 
   const filePath =
-    `${album.artist}::${album.title}.${fileExtension}`
-
+  `${album.id}.${fileExtension}`
+  
   const { error: uploadError } =
     await supabase.storage
       .from('album-covers')
