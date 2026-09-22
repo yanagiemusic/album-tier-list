@@ -174,9 +174,10 @@ const newAlbums = allData.map((album, index) => {
     artist: album.artist,
     tier: null,
     image:
-  imageUrls[`${index + 1}.jpg`] ||
-  imageUrls[`${index + 1}.jpeg`] ||
-  imageUrls[`${index + 1}.png`] ||
+  Object.entries(imageUrls).find(
+    ([fileName]) =>
+      fileName === `${index + 1}.${fileName.split('.').pop()}`
+  )?.[1] ||
   Object.entries(imageUrls).find(
     ([fileName]) =>
       fileName.startsWith(imageKey + '.')
